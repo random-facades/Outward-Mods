@@ -184,14 +184,42 @@ namespace NewGamePlus
                                         // Do nothing, cause already equipped
                                         break;
                                     case '3':
-                                        if (!typeof(Skill).IsAssignableFrom(item.GetType()))
-                                            logboy.Log(LogLevel.Error, "Can't learn a non-skill: " + item.Name);
-                                        else if (item.ItemID != 8100120 && item.ItemID != 8100010 && item.ItemID != 8100072 && item.ItemID != 8200600)
+                                        if (!(item is Skill))
                                         {
-                                            player.Inventory.TryUnlockSkill((Skill)item);
-                                            if (!player.Inventory.LearnedSkill(item))
-                                                logboy.Log(LogLevel.Error, "Failed to learn skill: " + item.Name);
+                                            logboy.Log(LogLevel.Error, "Can't learn a non-skill: " + item.Name);
+                                            break;
                                         }
+                                        // Check for Push Kick, Throw Lantern, Fire/Reload, or Dagger Slash (tutorial event will give duplicates)
+                                        if (item.ItemID == 8100120 || item.ItemID == 8100010 || item.ItemID == 8100072 || item.ItemID == 8200600)
+                                            break;
+                                        // Check for Exalted, and remove it or add LifeDrain
+                                        if (item.ItemID == 8205999)
+                                        {
+                                            if (Settings.RemoveExalted)
+                                                break;
+                                            // TODO: Add Life Drain as appropriate
+
+                                            foreach (BasicSaveData status in m_legacy.CharSave.PSave.StatusList)
+                                            {
+                                                if (status != null && !string.IsNullOrEmpty(status.SyncData))
+                                                {
+                                                    string _statusPrefabName = status.Identifier.ToString();
+                                                    if(_statusPrefabName.Contains("Life Drain"))
+                                                    {
+                                                        string[] _splitData = StatusEffect.SplitNetworkData(status.SyncData);
+                                                        StatusEffect statusEffectPrefab = ResourcesPrefabManager.Instance.GetStatusEffectPrefab(_statusPrefabName);
+                                                        player.StatusEffectMngr.AddStatusEffect(statusEffectPrefab, null, _splitData);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+
+                                        }
+
+                                        player.Inventory.TryUnlockSkill((Skill)item);
+                                        if (!player.Inventory.LearnedSkill(item))
+                                            logboy.Log(LogLevel.Error, "Failed to learn skill: " + item.Name);
+
                                         break;
                                     default:
                                         logboy.Log(LogLevel.Error, "Unknown Item Detected: " + item.Name + " - " + data.SyncData);
@@ -251,18 +279,6 @@ namespace NewGamePlus
                 setMaxStats = true;
             }
         }
-
-        /*
-        public static IEnumerator SetStatsToMax()
-        {
-            Character player = CharacterManager.Instance.GetFirstLocalCharacter();
-
-            player.PlayerStats.RestoreAllVitals();
-
-
-            yield return new WaitForSeconds(0.25f);
-        }
-        */
 
         // Copied from ItemManager
         private static string ItemSavesToString(BasicSaveData[] _itemSaves)
@@ -338,7 +354,6 @@ namespace NewGamePlus
             public static void Postfix()
             {
                 CopySaveInfo();
-
             }
         }
 
