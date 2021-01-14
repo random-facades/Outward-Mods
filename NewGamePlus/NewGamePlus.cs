@@ -19,8 +19,8 @@ namespace NewGamePlus
         public static bool DeleteKeys = true;
         public static string DeleteKeys_Name = "DeleteKeys";
 
-        public static bool RemoveExalted = true;
-        public static string RemoveExalted_Name = "RemoveExalted";
+        public static bool TransferExalted = false;
+        public static string TransferExalted_Name = "TransferExalted";
     }
 
     [BepInPlugin(ID, NAME, VERSION)]
@@ -78,9 +78,9 @@ namespace NewGamePlus
                     },
                     new BoolSetting
                     {
-                        Name = Settings.RemoveExalted_Name,
-                        Description = "Remove Exalted & Life Drain on Creation",
-                        DefaultValue = true
+                        Name = Settings.TransferExalted_Name,
+                        Description = "Transfer Exalted & Life Drain on Creation",
+                        DefaultValue = false
                     }
                 }
             };
@@ -92,7 +92,7 @@ namespace NewGamePlus
         {
             Settings.DisableNG = (bool)config.GetValue(Settings.DisableNG_Name);
             Settings.DeleteKeys = (bool)config.GetValue(Settings.DeleteKeys_Name);
-            Settings.RemoveExalted = (bool)config.GetValue(Settings.RemoveExalted_Name);
+            Settings.TransferExalted = (bool)config.GetValue(Settings.TransferExalted_Name);
         }
 
         public static bool setMaxStats = false;
@@ -195,7 +195,7 @@ namespace NewGamePlus
                                         // Check for Exalted, and remove it or add LifeDrain
                                         if (item.ItemID == 8205999)
                                         {
-                                            if (Settings.RemoveExalted)
+                                            if (!Settings.TransferExalted)
                                                 break;
                                             // TODO: Add Life Drain as appropriate
 
