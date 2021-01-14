@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30204.135
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewGamePlus", "NewGamePlus\NewGamePlus.csproj", "{15295FC1-C739-443A-AF2D-DBBFCA0509BA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NewGamePlus", "NewGamePlus.csproj", "{35D4750C-437A-4C3E-B49D-BFBAE4A5EE93}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{15295FC1-C739-443A-AF2D-DBBFCA0509BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{15295FC1-C739-443A-AF2D-DBBFCA0509BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{15295FC1-C739-443A-AF2D-DBBFCA0509BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{15295FC1-C739-443A-AF2D-DBBFCA0509BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{35D4750C-437A-4C3E-B49D-BFBAE4A5EE93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{35D4750C-437A-4C3E-B49D-BFBAE4A5EE93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{35D4750C-437A-4C3E-B49D-BFBAE4A5EE93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{35D4750C-437A-4C3E-B49D-BFBAE4A5EE93}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {3D7F8A3E-DE07-4FC2-ABC6-158CA0085C5B}
+		SolutionGuid = {3AC57C0D-247F-4FAD-909E-31B30BEEFE89}
 	EndGlobalSection
 EndGlobal

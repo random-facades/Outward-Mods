@@ -446,7 +446,7 @@ namespace NewGamePlus
             [HarmonyPostfix]
             public static void Postfix(CharacterSave __instance)
             {
-                if(ActiveLegacyLevels.TryGetValue(__instance.CharacterUID, out int level))
+                if (ActiveLegacyLevels.TryGetValue(__instance.CharacterUID, out int level))
                 {
                     logboy.Log(LogLevel.Message, "Saving Legacy Level of " + level);
                     SaveLegacyLevelToPlayerSaveData(ref __instance.PSave, level);
@@ -462,7 +462,7 @@ namespace NewGamePlus
             public static void Postfix(ref PlayerSaveData _save)
             {
                 int level = GetLegacyLevelFromPlayerSaveData(_save);
-                if(level > 0)
+                if (level > 0)
                 {
                     ActiveLegacyLevels[_save.UID] = level;
                     logboy.Log(LogLevel.Message, "Loaded Legacy Level of " + level);
