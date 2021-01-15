@@ -1,4 +1,21 @@
 ﻿// MyMod.cs
+
+/*   -------------  TODO LIST  -------------
+ *   
+ *   * Implement SideLoader 3.1.13 Features (PlayerSaveExtension,etc)
+ *   * Stacking Status Effect for difficulty
+ *   
+ *   
+ *   
+ *   -------------  TOLEARN LIST  -------------
+ *   
+ *   * Status Effect creation through SideLoader
+ *   * Probably more stuff, but forgot
+ *   
+ *   
+ */
+
+
 using System;
 using BepInEx;
 using BepInEx.Logging;
@@ -97,7 +114,7 @@ namespace NewGamePlus
     {
         const string ID = "com.random_facades.newgameplus";
         const string NAME = "New Game+";
-        const string VERSION = "0.2";
+        const string VERSION = "0.3";
         public static double VersionNum = double.Parse(VERSION);
 
         public static ModConfig config;
@@ -387,6 +404,11 @@ namespace NewGamePlus
             return level;
         }
 
+        private static bool CharacterHasLegacySkill(Character character, Skill skill)
+        {
+            return ActiveLegacySkills.TryGetValue(character.UID, out int[] skills) && skills.Contains(skill.ItemID);
+        }
+
         public static ManualLogSource logboy;
         public static SaveInstance m_legacy;
         public static List<BasicSaveData> itemList;
@@ -565,6 +587,31 @@ namespace NewGamePlus
                     NewGamePlus.ActiveLegacySkills[___m_character.UID] = skills.ToArray();
                     Log("Loaded LegacySkills for " + ___m_character.Name + ": " + skills.Count);
                 }
+
+
+            }
+        }
+
+        // to allow purchasing of ALL SKILLS!!!
+        [HarmonyPatch(typeof(SkillSlot), "IsBlocked", new Type[] { typeof(Character), typeof(bool) })]
+        public class SkillSlot_IsBlocked
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(SkillSlot __instance, ref bool __result, Character _character, ref bool _notify)
+            {
+                // If you gained this skill as a legacy skill, then show it as blocked
+                if(NewGamePlus.CharacterHasLegacySkill(_character, __instance.Skill))
+                {
+                    __result = true;
+                    return false;
+                }
+
+                if (__instance.SiblingSlot != null && NewGamePlus.CharacterHasLegacySkill(_character, __instance.SiblingSlot.Skill))
+                {
+                    __result = false;
+                    return false;
+                }
+                return true;
             }
         }
     }
