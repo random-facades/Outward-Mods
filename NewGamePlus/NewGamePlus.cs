@@ -22,12 +22,8 @@ using BepInEx.Logging;
 using System.Reflection;
 using HarmonyLib;
 using System.Collections.Generic;
-using UnityEngine;
-using System.Collections;
 using SharedModConfig;
 using SideLoader.SaveData;
-using SideLoader;
-using System.IO;
 
 namespace NewGamePlus
 {
@@ -75,6 +71,7 @@ namespace NewGamePlus
                 NewGamePlus.logboy.Log(LogLevel.Message, "Loaded LegacySkills for " + character.Name + ": " + temp.Length);
         }
 
+        /*
         public static NewGameExtension LoadSaveExtensionFor(string uid)
         {
             string customFolder = (string)At.GetFieldStatic(typeof(SLSaveManager), "CUSTOM_FOLDER");
@@ -106,6 +103,7 @@ namespace NewGamePlus
 
             return null;
         }
+        */
     }
 
     [BepInPlugin(ID, NAME, VERSION)]
@@ -129,19 +127,17 @@ namespace NewGamePlus
         internal void Awake()
         {
             Instance = this;
-            SaveExt = new NewGameExtension();
-            SaveExt.Prepare();
+            logboy = Logger;
 
             var harmony = new Harmony(ID);
             harmony.PatchAll();
-
-            logboy = Logger;
-            logboy.Log(LogLevel.Message, "New Game Plus starting...");
 
             config = SetupConfig();
             config.Register();
             SettingsChanged();
             config.OnSettingsSaved += SettingsChanged;
+
+            Log("New Game Plus starting...");
         }
 
         private ModConfig SetupConfig()
@@ -396,7 +392,7 @@ namespace NewGamePlus
         {
             if (!ActiveLegacyLevels.TryGetValue(uid, out int level))
             {
-                NewGameExtension nge = NewGameExtension.LoadSaveExtensionFor(uid);
+                NewGameExtension nge = PlayerSaveExtension.TryLoadExtension<NewGameExtension>(uid);
                 if (nge != null)
                     level = nge.LegacyLevel;
                 ActiveLegacyLevels[uid] = level;
