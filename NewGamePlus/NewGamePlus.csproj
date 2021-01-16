@@ -85,6 +85,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="StatusEffectManager.cs" />
     <Compile Include="NewGamePlus.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

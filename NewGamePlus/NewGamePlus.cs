@@ -2,7 +2,6 @@
 
 /*   -------------  TODO LIST  -------------
  *   
- *   * Implement SideLoader 3.1.13 Features (PlayerSaveExtension,etc)
  *   * Stacking Status Effect for difficulty
  *   
  *   
@@ -15,7 +14,6 @@
  *   
  */
 
-
 using System;
 using BepInEx;
 using BepInEx.Logging;
@@ -24,6 +22,8 @@ using HarmonyLib;
 using System.Collections.Generic;
 using SharedModConfig;
 using SideLoader.SaveData;
+using System.Collections;
+using UnityEngine;
 
 namespace NewGamePlus
 {
@@ -128,6 +128,8 @@ namespace NewGamePlus
         {
             Instance = this;
             logboy = Logger;
+
+            StatusEffectManager.InitializeEffects();
 
             var harmony = new Harmony(ID);
             harmony.PatchAll();
@@ -556,32 +558,48 @@ namespace NewGamePlus
         }
 
         // To set health to max when loading character in
-        [HarmonyPatch(typeof(CharacterStats), "OnGameplayLoadingDone")]
-        public class CharacterStats_OnGameplayLoadingDone
+        [HarmonyPatch(typeof(NetworkLevelLoader), "OnReportLoadingProgress", new Type[] { typeof(float) })]
+        public class NetworkLevelLoader_OnReportLoadingProgress
         {
-            [HarmonyPostfix]
-            public static void Postfix(CharacterStats __instance, ref Character ___m_character)
+            [HarmonyPrefix]
+            public static void Prefix(NetworkLevelLoader __instance, ref float _progress)
             {
-                if (setMaxStats)
-                {
-                    logboy.Log(LogLevel.Message, "Resetting Stats");
-                    setMaxStats = false;
-                    __instance.RestoreAllVitals();
-                }
 
 
-                // Check if ActiveLegacySkills has the value
-                //  if it don't, and it's legacylevel > 0, do this:
-                if (NewGamePlus.ActiveLegacyLevels.TryGetValue(___m_character.UID, out int level) && level > 0 && !NewGamePlus.ActiveLegacySkills.TryGetValue(___m_character.UID, out _))
+                if(_progress >= 1f)
                 {
-                    List<int> skills = new List<int>();
-                    foreach (Item item in ___m_character.Inventory.SkillKnowledge.GetLearnedItems())
+                    Character player = CharacterManager.Instance.GetFirstLocalCharacter();
+                    if (setMaxStats)
                     {
-                        if (!skills.Contains(item.ItemID))
-                            skills.Add(item.ItemID);
+                        logboy.Log(LogLevel.Message, "Resetting Stats");
+                        player.Stats.RestoreAllVitals();
+                        setMaxStats = false;
+
                     }
-                    NewGamePlus.ActiveLegacySkills[___m_character.UID] = skills.ToArray();
-                    Log("Loaded LegacySkills for " + ___m_character.Name + ": " + skills.Count);
+                    // Do special stuff for legacy characters
+                    if (ActiveLegacyLevels.TryGetValue(player.UID, out int level) && level > 0)
+                    {
+                        // Check if ActiveLegacySkills has the value, if not create it
+                        if (!ActiveLegacySkills.TryGetValue(player.UID, out _))
+                        {
+                            List<int> skills = new List<int>();
+                            foreach (Item item in player.Inventory.SkillKnowledge.GetLearnedItems())
+                            {
+                                if (!skills.Contains(item.ItemID))
+                                    skills.Add(item.ItemID);
+                            }
+                            ActiveLegacySkills[player.UID] = skills.ToArray();
+                            Log("Loaded LegacySkills for " + player.Name + ": " + skills.Count);
+                        }
+
+                        // Check if debuffs exist, if not apply them
+                        int i = 0;
+                        StatusEffect temp = player.StatusEffectMngr.GetStatusEffectOfName("Stretched Thin");
+                        if (temp != null)
+                            i = temp.StackCount;
+                        for (; i < level; i++)
+                            player.StatusEffectMngr.AddStatusEffect("Stretched Thin");
+                    }
                 }
 
 
@@ -596,7 +614,7 @@ namespace NewGamePlus
             public static bool Prefix(SkillSlot __instance, ref bool __result, Character _character, ref bool _notify)
             {
                 // If you gained this skill as a legacy skill, then show it as blocked
-                if(NewGamePlus.CharacterHasLegacySkill(_character, __instance.Skill))
+                if (NewGamePlus.CharacterHasLegacySkill(_character, __instance.Skill))
                 {
                     __result = true;
                     return false;
