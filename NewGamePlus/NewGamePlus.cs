@@ -2,15 +2,15 @@
 
 /*   -------------  TODO LIST  -------------
  *   
- *   * Stacking Status Effect for difficulty
- *   
- *   
+ *   ICON
  *   
  *   -------------  TOLEARN LIST  -------------
  *   
- *   * Status Effect creation through SideLoader
  *   * Probably more stuff, but forgot
  *   
+ *   -------------  TOFIX (eventually) LIST  -------------
+ *   
+ *   Quickslot's graying out upon create new character
  *   
  */
 
@@ -22,8 +22,7 @@ using HarmonyLib;
 using System.Collections.Generic;
 using SharedModConfig;
 using SideLoader.SaveData;
-using System.Collections;
-using UnityEngine;
+using SideLoader;
 
 namespace NewGamePlus
 {
@@ -39,71 +38,62 @@ namespace NewGamePlus
         public static string TransferExalted_Name = "TransferExalted";
     }
 
-    // Class is destroyed after any function
-    //    Well... not literally, but treat it like that
     public class NewGameExtension : PlayerSaveExtension
     {
         public int LegacyLevel;
         public int[] LegacySkills;
 
-        // Save Variables so that class can be Serialized
+        public NewGameExtension() : base()
+        {
+            LegacyLevel = 0;
+        }
+
         public override void Save(Character character, bool isWorldHost)
         {
-            if (NewGamePlus.ActiveLegacyLevels.TryGetValue(character.UID, out int level))
-                LegacyLevel = level;
-            if (NewGamePlus.ActiveLegacySkills.TryGetValue(character.UID, out int[] skills))
-                LegacySkills = skills;
+            if (NewGamePlus.SaveData.TryGetValue(character.UID, out NewGameExtension save))
+            {
+                LegacyLevel = save.LegacyLevel;
+                LegacySkills = save.LegacySkills;
+            }
         }
 
-        // Variables have been init'd, apply them to world/char/mod
         public override void ApplyLoadedSave(Character character, bool isWorldHost)
         {
-            // With Pre 0.2 Characters, LegacyLevel will be initialized in ActiveLegacyLevels by Character_LoadPlayerSave
-            //    Character_LoadPlayerSave is ran before this
-            if (!NewGamePlus.ActiveLegacyLevels.TryGetValue(character.UID, out _) || LegacyLevel != 0)
-                NewGamePlus.ActiveLegacyLevels[character.UID] = LegacyLevel;
-
-            if (LegacySkills != null)
-                NewGamePlus.ActiveLegacySkills[character.UID] = LegacySkills;
+            if (NewGamePlus.SaveData.ContainsKey(character.UID))
+                NewGamePlus.logboy.Log(LogLevel.Error, "Save Data already exists for " + character.Name);
+            NewGamePlus.SaveData[character.UID] = this;
 
             NewGamePlus.logboy.Log(LogLevel.Message, "Loaded Legacy Level for " + character.Name + ": " + LegacyLevel);
-            if (NewGamePlus.ActiveLegacySkills.TryGetValue(character.UID, out int[] temp) && temp?.Length > 0)
-                NewGamePlus.logboy.Log(LogLevel.Message, "Loaded LegacySkills for " + character.Name + ": " + temp.Length);
+            if (LegacySkills?.Length > 0)
+                NewGamePlus.logboy.Log(LogLevel.Message, "Loaded LegacySkills for " + character.Name + ": " + LegacySkills.Length);
         }
 
-        /*
-        public static NewGameExtension LoadSaveExtensionFor(string uid)
+        public static NewGameExtension CreateExtensionFor(string UID)
         {
-            string customFolder = (string)At.GetFieldStatic(typeof(SLSaveManager), "CUSTOM_FOLDER");
-            string saveDataFolder = (string)At.GetFieldStatic(typeof(SLSaveManager), "SAVEDATA_FOLDER");
-            string dir = $@"{saveDataFolder}\{uid}\{customFolder}\";
-
-            foreach (string fileName in Directory.GetFiles(dir))
+            if (!NewGamePlus.SaveData.TryGetValue(UID, out NewGameExtension nge))
             {
-                string typename = Serializer.GetBaseTypeOfXmlDocument(fileName);
-                if (typeof(NewGameExtension).Name == typename)
-                {
-                    System.Xml.Serialization.XmlSerializer serializer = Serializer.GetXmlSerializer(typeof(NewGameExtension));
-                    using (FileStream xml = File.OpenRead(fileName))
-                    {
-                        try
-                        {
-                            if (serializer.Deserialize(xml) is NewGameExtension ext)
-                                return ext;
-                            else
-                                NewGamePlus.Log("Couldn't load NewGameExtension XML!");
-                        }
-                        catch (Exception)
-                        {
-                            NewGamePlus.Log("Exception loading NewGameExtension XML!");
-                        }
-                    }
-                }
+                nge = TryLoadExtension<NewGameExtension>(UID);
+                if (nge == null)
+                    nge = new NewGameExtension();
+                NewGamePlus.SaveData[UID] = nge;
             }
-
-            return null;
+            return nge;
         }
-        */
+
+        public static int GetLegacyLevelFor(string UID)
+        {
+            if (NewGamePlus.SaveData.TryGetValue(UID, out NewGameExtension nge))
+                return nge.LegacyLevel;
+
+            int ret = 0;
+            nge = TryLoadExtension<NewGameExtension>(UID);
+            if (nge != null)
+            {
+                ret = nge.LegacyLevel;
+                NewGamePlus.SaveData.Remove(UID);
+            }
+            return ret;
+        }
     }
 
     [BepInPlugin(ID, NAME, VERSION)]
@@ -112,15 +102,14 @@ namespace NewGamePlus
     {
         const string ID = "com.random_facades.newgameplus";
         const string NAME = "New Game+";
-        const string VERSION = "0.3";
+        const string VERSION = "1.0";
         public static double VersionNum = double.Parse(VERSION);
 
         public static ModConfig config;
 
         const BindingFlags FLAGS = BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Static;
 
-        public static Dictionary<string, int> ActiveLegacyLevels = new Dictionary<string, int>();
-        public static Dictionary<string, int[]> ActiveLegacySkills = new Dictionary<string, int[]>();
+        public static Dictionary<string, NewGameExtension> SaveData = new Dictionary<string, NewGameExtension>();
         public static NewGamePlus Instance;
         public static NewGameExtension SaveExt;
 
@@ -129,7 +118,8 @@ namespace NewGamePlus
             Instance = this;
             logboy = Logger;
 
-            StatusEffectManager.InitializeEffects();
+            NG_StatusManager.InitializeEffects();
+            SL.OnPacksLoaded += NG_StatusManager.UpdateLevelData;
 
             var harmony = new Harmony(ID);
             harmony.PatchAll();
@@ -188,13 +178,19 @@ namespace NewGamePlus
         {
             if (itemList != null)
             {
-                int legacyLevel = m_legacy.CharSave.PSave.LegacyLevel;
-                if (legacyLevel == 0)
-                    legacyLevel = GetLegacyLevelFor(m_legacy.CharSave.CharacterUID);
-                legacyLevel++;
                 Character player = CharacterManager.Instance.GetFirstLocalCharacter();
+                NewGameExtension player_nge = NewGameExtension.CreateExtensionFor(player.UID);
+
+
+                // Two Options
+                //    Option1: 0.X Character with LegacyLevel set, but no PSE
+                if (m_legacy.CharSave.PSave.LegacyLevel > 0)
+                    player_nge.LegacyLevel = m_legacy.CharSave.PSave.LegacyLevel + 1;
+                //    Option2: 1.0+ Character with PSE
+                else
+                    player_nge.LegacyLevel = NewGameExtension.GetLegacyLevelFor(m_legacy.CharSave.CharacterUID) + 1;
+
                 logboy.Log(LogLevel.Message, "Loading Legacy Gear from " + m_legacy.CharSave.PSave.Name);
-                ActiveLegacyLevels[player.UID] = legacyLevel;
                 List<int> legacySkills = new List<int>();
 
                 player.Inventory.Pouch.SetSilverCount(m_legacy.CharSave.PSave.Money);
@@ -214,8 +210,9 @@ namespace NewGamePlus
                             if (type == '2')
                             {
                                 item.ChangeParent(player.Inventory.Pouch.transform);
-                                item.SetIsntNew();
                                 Equipment clone = (Equipment)ItemManager.Instance.CloneItem(item);
+                                clone.OnContainerChangedOwner(player);
+                                clone.SetIsntNew();
                                 clone.ChangeParent(player.Inventory.Pouch.transform);
                                 player.Inventory.EquipItem(clone);
                                 clone.ForceStartInit();
@@ -254,10 +251,11 @@ namespace NewGamePlus
                             if (type.StartsWith("1Pouch"))
                             {
                                 item.ChangeParent(player.Inventory.Pouch.transform);
-                                item.SetIsntNew();
                                 Item clone = ItemManager.Instance.CloneItem(item);
                                 if (item.RemainingAmount != clone.RemainingAmount)
                                     clone.RemainingAmount = item.RemainingAmount;
+                                clone.OnContainerChangedOwner(player);
+                                clone.SetIsntNew();
                                 clone.ChangeParent(player.Inventory.Pouch.transform);
                                 clone.ForceStartInit();
                             }
@@ -266,6 +264,8 @@ namespace NewGamePlus
                                 switch (type[0])
                                 {
                                     case '1':
+                                        item.OnContainerChangedOwner(player);
+                                        item.SetIsntNew();
                                         item.ChangeParent(player.Inventory.Pouch.transform);
                                         player.Inventory.TakeItemToBag(item);
                                         item.ForceStartInit();
@@ -358,9 +358,11 @@ namespace NewGamePlus
 
                 player.TargetingSystem.SetHelpLockCount(m_legacy.CharSave.PSave.HelpLockCount);
 
-                ActiveLegacySkills[player.UID] = legacySkills.ToArray();
-                logboy.Log(LogLevel.Message, "Increasing Legacy Level to " + legacyLevel);
+                player_nge.LegacySkills = legacySkills.ToArray();
+                logboy.Log(LogLevel.Message, "Increasing Legacy Level to " + player_nge.LegacyLevel);
+                logboy.Log(LogLevel.Message, "Giving Character " + legacySkills.Count + " Legacy Skills");
 
+                SaveData[player.UID] = player_nge;
 
                 itemList.Clear();
                 itemList = null;
@@ -390,21 +392,9 @@ namespace NewGamePlus
             logboy.Log(LogLevel.Message, message);
         }
 
-        public static int GetLegacyLevelFor(string uid)
-        {
-            if (!ActiveLegacyLevels.TryGetValue(uid, out int level))
-            {
-                NewGameExtension nge = PlayerSaveExtension.TryLoadExtension<NewGameExtension>(uid);
-                if (nge != null)
-                    level = nge.LegacyLevel;
-                ActiveLegacyLevels[uid] = level;
-            }
-            return level;
-        }
-
         private static bool CharacterHasLegacySkill(Character character, Skill skill)
         {
-            return ActiveLegacySkills.TryGetValue(character.UID, out int[] skills) && skills.Contains(skill.ItemID);
+            return SaveData.TryGetValue(character.UID, out NewGameExtension nge) && nge.LegacySkills != null && nge.LegacySkills.Contains(skill.ItemID);
         }
 
         public static ManualLogSource logboy;
@@ -430,17 +420,6 @@ namespace NewGamePlus
             }
         }
 
-        // To trigger copying items to new character
-        [HarmonyPatch(typeof(StartingEquipment), "Init")]
-        public class StartingEquipment_Init
-        {
-            [HarmonyPostfix]
-            public static void Postfix()
-            {
-                CreateNewCharacter();
-            }
-        }
-
         // To change character creation settings to match Legacy Character
         [HarmonyPatch(typeof(CharacterCreationPanel), "OnLegacySelected", new Type[] { typeof(SaveInstance) })]
         public class CharacterCreationPanel_OnLegacySelected
@@ -459,7 +438,7 @@ namespace NewGamePlus
                     CharacterVisualData legacy = _instance.CharSave.PSave.VisualData;
                     int legacyLevel = _instance.CharSave.PSave.LegacyLevel;
                     if (legacyLevel == 0)
-                        legacyLevel = GetLegacyLevelFor(_instance.CharSave.CharacterUID);
+                        legacyLevel = NewGameExtension.GetLegacyLevelFor(_instance.CharSave.CharacterUID);
 
                     string legacyName = _instance.CharSave.PSave.Name;
                     string[] splits = legacyName.Split(' ');
@@ -552,9 +531,33 @@ namespace NewGamePlus
                 int level = _save.LegacyLevel;
                 if (level > 0)
                 {
-                    ActiveLegacyLevels[_save.UID] = level;
+                    if (SaveData.TryGetValue(_save.UID, out NewGameExtension nge))
+                        nge.LegacyLevel = level;
+                    else
+                        logboy.Log(LogLevel.Error, "Missing NewGameExtension for Loaded Save");
                 }
             }
+        }
+
+        /*
+         * Legacy Method of Saving LegacyLevel
+         * 
+        [HarmonyPatch(typeof(CharacterSave), "PrepareSave")]
+        public class CharacterSave_PrepareSave
+        {
+            [HarmonyPostfix]
+            public static void Postfix(ref CharacterSave __instance)
+            {
+                if(SaveData.TryGetValue(__instance.CharacterUID,out NewGameExtension nge))
+                    __instance.PSave.LegacyLevel = nge.LegacyLevel;
+            }
+        }
+         */
+
+        public static void MarkAllSkillsAsNotNew(Character player)
+        {
+            foreach(Item item in player.Inventory.SkillKnowledge.GetLearnedItems())
+                item.SetIsntNew();
         }
 
         // To set health to max when loading character in
@@ -564,9 +567,10 @@ namespace NewGamePlus
             [HarmonyPrefix]
             public static void Prefix(NetworkLevelLoader __instance, ref float _progress)
             {
+                if (_progress > 0.6f)
+                    CreateNewCharacter();
 
-
-                if(_progress >= 1f)
+                if (_progress >= 1f)
                 {
                     Character player = CharacterManager.Instance.GetFirstLocalCharacter();
                     if (setMaxStats)
@@ -575,12 +579,13 @@ namespace NewGamePlus
                         player.Stats.RestoreAllVitals();
                         setMaxStats = false;
 
+                        MarkAllSkillsAsNotNew(player);
                     }
                     // Do special stuff for legacy characters
-                    if (ActiveLegacyLevels.TryGetValue(player.UID, out int level) && level > 0)
+                    if (SaveData.TryGetValue(player.UID, out NewGameExtension nge) && nge.LegacyLevel > 0)
                     {
-                        // Check if ActiveLegacySkills has the value, if not create it
-                        if (!ActiveLegacySkills.TryGetValue(player.UID, out _))
+                        // Check if LegacySkills is blank or empty
+                        if (nge.LegacySkills == null || nge.LegacySkills.Length == 0)
                         {
                             List<int> skills = new List<int>();
                             foreach (Item item in player.Inventory.SkillKnowledge.GetLearnedItems())
@@ -588,21 +593,20 @@ namespace NewGamePlus
                                 if (!skills.Contains(item.ItemID))
                                     skills.Add(item.ItemID);
                             }
-                            ActiveLegacySkills[player.UID] = skills.ToArray();
+                            SaveData[player.UID].LegacySkills = skills.ToArray();
                             Log("Loaded LegacySkills for " + player.Name + ": " + skills.Count);
                         }
 
                         // Check if debuffs exist, if not apply them
-                        int i = 0;
-                        StatusEffect temp = player.StatusEffectMngr.GetStatusEffectOfName("Stretched Thin");
-                        if (temp != null)
-                            i = temp.StackCount;
-                        for (; i < level; i++)
-                            player.StatusEffectMngr.AddStatusEffect("Stretched Thin");
+                        if (nge.LegacyLevel > 0)
+                        {
+                            LevelStatusEffect temp = (LevelStatusEffect)player.StatusEffectMngr.GetStatusEffectOfName("Stretched Thin");
+                            if (temp == null)
+                                temp = (LevelStatusEffect)player.StatusEffectMngr.AddStatusEffect("Stretched Thin");
+                            temp.IncreaseLevel(nge.LegacyLevel - temp.CurrentLevel);
+                        }
                     }
                 }
-
-
             }
         }
 
