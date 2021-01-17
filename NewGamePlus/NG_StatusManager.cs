@@ -59,8 +59,8 @@ namespace NewGamePlus
 
         public static void InitializeEffects()
         {
-            //eff.SLPackName = "NewGamePlus";
-            //eff.SubfolderName = "LegacyEffect";
+            eff.SLPackName = "NewGamePlus";
+            eff.SubfolderName = "Stretched_Thin";
             eff.Apply();
         }
 
