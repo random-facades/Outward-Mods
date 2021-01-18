@@ -102,8 +102,10 @@ namespace NewGamePlus
     {
         const string ID = "com.random_facades.newgameplus";
         const string NAME = "New Game+";
-        const string VERSION = "1.0";
-        public static double VersionNum = double.Parse(VERSION);
+        const string VERSION = "1.1";
+        //  Can't be fancy cause localization issues
+        //public static double VersionNum = double.Parse(VERSION);
+        public static double VersionNum = 1.1;
 
         public static ModConfig config;
 
@@ -326,30 +328,6 @@ namespace NewGamePlus
 
                 player.ApplyQuicklots(m_legacy.CharSave.PSave);
 
-                try
-                {
-                    int i = 0;
-                    while (true)
-                    {
-                        QuickSlot slot = player.QuickSlotMngr.GetQuickSlot(i);
-                        if (slot.ActiveItem is Skill)
-                        {
-                            Item skill = player.Inventory.SkillKnowledge.GetItemFromItemID(slot.ActiveItem.ItemID);
-                            if (skill != null)
-                                slot.SetQuickSlot(skill);
-                            else
-                                slot.CheckAndUpdateRefItem();
-                        }
-                        else
-                        {
-                            slot.CheckAndUpdateRefItem();
-                        }
-
-                        i++;
-                    }
-                }
-                catch (Exception) { }
-
                 PropertyInfo pi_DropBag = typeof(Character).GetProperty("HelpDropBagCount");
                 pi_DropBag.SetValue(player, m_legacy.CharSave.PSave.HelpDropBagCount);
 
@@ -502,6 +480,21 @@ namespace NewGamePlus
 
         // To fix issue with one of the 4 starter skills being in a quickslot when starting new game plus
         //     would cause the message of "skill not in inventory"
+        public static void FixQuickSlots(Character player)
+        {
+            for (int i = 0; i < player.QuickSlotMngr.QuickSlotCount; i++)
+            {
+                QuickSlot slot = player.QuickSlotMngr.GetQuickSlot(i);
+                if (slot.ActiveItem is Skill && !player.Inventory.OwnsItem(slot.ActiveItem.UID))
+                {
+                    Item skill = player.Inventory.SkillKnowledge.GetItemFromItemID(slot.ActiveItem.ItemID);
+                    if (skill != null)
+                        slot.SetQuickSlot(skill);
+                }
+            }
+        }
+
+        /*
         [HarmonyPatch(typeof(QuickSlot), "Activate")]
         public class QuickSlot_Activate
         {
@@ -519,6 +512,7 @@ namespace NewGamePlus
                 }
             }
         }
+        */
 
         // LEGACY METHOD OF LOADING LegacyLevel
         //    Can't remove due to breaking older games
@@ -556,7 +550,7 @@ namespace NewGamePlus
 
         public static void MarkAllSkillsAsNotNew(Character player)
         {
-            foreach(Item item in player.Inventory.SkillKnowledge.GetLearnedItems())
+            foreach (Item item in player.Inventory.SkillKnowledge.GetLearnedItems())
                 item.SetIsntNew();
         }
 
@@ -578,7 +572,7 @@ namespace NewGamePlus
                         logboy.Log(LogLevel.Message, "Resetting Stats");
                         player.Stats.RestoreAllVitals();
                         setMaxStats = false;
-
+                        FixQuickSlots(player);
                         MarkAllSkillsAsNotNew(player);
                     }
                     // Do special stuff for legacy characters
