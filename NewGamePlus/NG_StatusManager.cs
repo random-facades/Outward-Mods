@@ -7,6 +7,7 @@ namespace NewGamePlus
     {
         const int RESISTANCE_CHANGE = 25;
         const int DAMAGE_CHANGE = 15;
+        const int MAX_LEVEL = 100;
 
         public static SL_LevelStatusEffect eff = new SL_LevelStatusEffect
         {
@@ -17,7 +18,7 @@ namespace NewGamePlus
             Description = "\"I feel thin, sort of stretched, like butter scraped over too much bread.\"\nAll Resistances [E1V1]%\nAll Damage and Impact [E2V1]%",
             Lifespan = -1,
             Purgeable = false,
-            MaxLevel = 100,
+            MaxLevel = MAX_LEVEL,
             EffectBehaviour = EditBehaviours.Destroy,
             Effects = new SL_EffectTransform[] {
                 new SL_EffectTransform
@@ -67,6 +68,11 @@ namespace NewGamePlus
         public static void UpdateLevelData()
         {
             LevelStatusEffect eff = (LevelStatusEffect)ResourcesPrefabManager.Instance.GetStatusEffectPrefab("Stretched Thin");
+
+            int currMaxLevel = (int)At.GetField(eff, "m_maxLevel");
+            if(currMaxLevel != MAX_LEVEL)
+                At.SetField(eff, "m_maxLevel", MAX_LEVEL);
+
             float multiplier = (100F - DAMAGE_CHANGE) / 100F;
             float newVal = multiplier;
             for (int i = 0; i < eff.StatusLevelData.Length; i++)
