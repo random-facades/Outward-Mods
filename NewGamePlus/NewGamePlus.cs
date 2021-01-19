@@ -2,7 +2,7 @@
 
 /*   -------------  TODO LIST  -------------
  *   
- *   ICON
+ *   
  *   
  *   -------------  TOLEARN LIST  -------------
  *   
@@ -10,7 +10,7 @@
  *   
  *   -------------  TOFIX (eventually) LIST  -------------
  *   
- *   Quickslot's graying out upon create new character
+ *   
  *   
  */
 
