@@ -76,8 +76,8 @@ namespace MoneyTooltip
     {
         public const string ID = "com.random_facades.itempricehelper";
         public const string NAME = "Item Price Helper";
-        public const string VERSION = "1.0";
-        public static double VersionNum = double.Parse(VERSION);
+        public const string VERSION = "1.1";
+        public static double VersionNum = 1.1;
 
         public static ItemPriceHelper Instance;
 
