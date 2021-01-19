@@ -7,8 +7,8 @@
     <ProjectGuid>{DA853FE8-B6F8-47BF-8093-B8F506086CB0}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MoneyTooltip</RootNamespace>
-    <AssemblyName>MoneyTooltip</AssemblyName>
+    <RootNamespace>ItemPriceHelper</RootNamespace>
+    <AssemblyName>ItemPriceHelper</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
