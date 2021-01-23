@@ -73,8 +73,8 @@ namespace ItemPriceHelper
     {
         public const string ID = "com.random_facades.itempricehelper";
         public const string NAME = "Item Price Helper";
-        public const string VERSION = "1.1";
-        public static double VersionNum = 1.1;
+        public const string VERSION = "1.2";
+        public static double VersionNum = 1.2;
 
         public static ItemPriceHelper Instance;
 
