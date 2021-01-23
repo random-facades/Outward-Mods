@@ -3,16 +3,13 @@ using BepInEx.Logging;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 using SideLoader;
 using SharedModConfig;
 using UnityEngine.UI;
 using System.IO;
 
-namespace MoneyTooltip
+namespace ItemPriceHelper
 {
     public class Settings
     {
@@ -151,60 +148,82 @@ namespace MoneyTooltip
                     icon.sprite = spr;
         }
 
-        [HarmonyPatch(typeof(ItemDisplay), "UpdateValueDisplay")]
-        public class ItemDisplay_UpdateValueDisplay
+        public static void UpdateValueDisplay(ItemDisplay itemDisplay, GameObject valueHolder, Text valueLabel)
         {
-            [HarmonyPostfix]
-            public static void Postfix(ItemDisplay __instance, ref GameObject ___m_valueHolder, ref Text ___m_lblValue)
+            if (valueHolder != null)
             {
-                // debugging fun
-
-                if (___m_lblValue != null && ___m_valueHolder != null)
+                if (valueLabel != null && itemDisplay.RefItem != null && itemDisplay.RefItem.IsSellable)
                 {
-                    if (!___m_valueHolder.activeSelf)
+                    string labelText = "~";
+                    if (Settings.RemoveTilde)
+                        labelText = "";
+
+                    float modifier = (float)At.GetField(itemDisplay.RefItem, "m_overrideSellModifier");
+                    if (modifier == -1)
                     {
-                        if (__instance.RefItem != null && __instance.RefItem.IsSellable && !(__instance.RefItem is Skill))
+                        modifier = 1 + itemDisplay.CharacterUI.TargetCharacter.GetItemSellPriceModifier(null, itemDisplay.RefItem);
+                        modifier *= 0.3f;
+                    }
+                    float price = modifier * itemDisplay.RefItem.RawCurrentValue;
+
+                    if (Settings.ShowValue)
+                    {
+                        float actualWeight = Math.Min(itemDisplay.RefItem.Weight, itemDisplay.RefItem.RawWeight);
+                        if (actualWeight == 0)
+                            labelText = '\u221E' + "x";
+                        else
                         {
-                            float num = (float)At.GetField(__instance.RefItem, "m_overrideSellModifier");
-                            if (num == -1)
-                            {
-                                num = 1 + __instance.CharacterUI.TargetCharacter.GetItemSellPriceModifier(null, __instance.RefItem);
-                                num *= 0.3f;
-                            }
-
-                            float price = num * __instance.RefItem.RawCurrentValue;
-
-                            string labelText = "~";
-                            if (Settings.RemoveTilde)
-                                labelText = "";
-                            if (Settings.ShowValue)
-                            {
-                                float actualWeight = Math.Min(__instance.RefItem.Weight, __instance.RefItem.RawWeight);
-                                if (actualWeight == 0)
-                                    labelText = '\u221E' + "x";
-                                else
-                                {
-                                    float value = price / actualWeight;
-                                    if (value > 10)
-                                        labelText = Mathf.RoundToInt(value).ToString() + "x";
-                                    else
-                                        labelText = (Mathf.RoundToInt(value * 10) / 10f).ToString() + "x";
-                                }
-                                SetSpriteTo(___m_valueHolder, WeightSprite);
-                            }
+                            float value = price / actualWeight;
+                            if (value > 10)
+                                labelText = Mathf.RoundToInt(value).ToString() + "x";
                             else
-                            {
-                                SetSpriteTo(___m_valueHolder, SilverSprite);
-                                labelText += Mathf.RoundToInt(price).ToString();
-                            }
-
-                            ___m_valueHolder.SetActive(true);
-                            ___m_lblValue.text = labelText;
+                                labelText = (Mathf.RoundToInt(value * 10) / 10f).ToString() + "x";
                         }
+                        SetSpriteTo(valueHolder, WeightSprite);
                     }
                     else
-                        SetSpriteTo(___m_valueHolder, SilverSprite);
+                    {
+                        labelText += Mathf.RoundToInt(price).ToString();
+                        SetSpriteTo(valueHolder, SilverSprite);
+                    }
+
+                    valueLabel.text = labelText;
+                    valueHolder.SetActive(true);
                 }
+                else
+                    valueHolder.SetActive(false);
+            }
+        }
+
+        public static bool IsVisible = false;
+
+        [HarmonyPatch(typeof(CharacterUI), "ShowMenu", new Type[] { typeof(CharacterUI.MenuScreens), typeof(Item) })]
+        public class CharacterUI_ShowMenu
+        {
+            [HarmonyPrefix]
+            public static void Prefix(CharacterUI __instance, ref CharacterUI.MenuScreens _menu, ref MenuPanel[] ___m_menus)
+            {
+                MenuPanel menuPanel = ___m_menus[(int)_menu];
+                IsVisible = (menuPanel is EnvironmentItemDisplay) || (_menu != CharacterUI.MenuScreens.Shop && menuPanel is InventoryMenu);
+            }
+        }
+
+        [HarmonyPatch(typeof(ItemDisplay))]
+        public class ItemDisplay_Hooks
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("SetReferencedItem")]
+            public static void Postfix1(ItemDisplay __instance, GameObject ___m_valueHolder, Text ___m_lblValue)
+            {
+                if (!Settings.DisableIPH && IsVisible && __instance.RefItem != null)
+                    UpdateValueDisplay(__instance, ___m_valueHolder, ___m_lblValue);
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch("UpdateValueDisplay")]
+            public static bool Prefix()
+            {
+                return Settings.DisableIPH || !IsVisible;
             }
         }
     }
