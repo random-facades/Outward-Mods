@@ -37,6 +37,7 @@ using SharedModConfig;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace RecipeAssistant
@@ -124,32 +125,12 @@ namespace RecipeAssistant
             Instance = null;
         }
 
-        public static Item ProcessItem(Item pre)
+        public static void AddItemToWrapper(string itemIDString)
         {
-            pre.DoUpdate();
-            pre.RegisterUID();
-            RecipeAssistant.Log("Processing: " + pre.Name + " - " + pre.UID);
-            return pre;
-        }
-
-        public static void LoadItemsFromContainer(ItemContainer box)
-        {
-            if (box != null)
-                foreach (Item item in box.GetContainedItems())
-                    if (item != null && !Instance.ContainsOfSameID(item.ItemID))
-                        Instance.AddItem(ProcessItem(ResourcesPrefabManager.Instance.GenerateItem(item.ItemIDString)));
-        }
-
-        internal static void LoadItemsFromEquipment(CharacterEquipment equipment)
-        {
-            EquipmentSlot[] slots = (EquipmentSlot[])SideLoader.At.GetField(equipment, "m_equipmentSlots");
-            RecipeAssistant.Log("Did it work? " + (slots != null));
-
-            foreach (EquipmentSlot slot in slots)
-            {
-                if (slot?.EquippedItem != null && !Instance.ContainsOfSameID(slot.EquippedItem.ItemID))
-                    Instance.AddItem(ProcessItem(ItemManager.Instance.CloneItem(slot.EquippedItem)));
-            }
+            Item item = ResourcesPrefabManager.Instance.GenerateItem(itemIDString);
+            item.DoUpdate();
+            item.RegisterUID();
+            Instance.AddItem(item);
         }
     }
 
@@ -191,12 +172,181 @@ namespace RecipeAssistant
 
         private static void CloseAssistant()
         {
-            Log("Closing Assistant");
             ContainerWrapper.DestroyPouch();
             AssistantActive = false;
             CharUI.CloseAllMenus();
             CharUI = null;
-            Log("Closed Assistant");
+            SelectedObject = null;
+            SelectedItem = null;
+        }
+
+        /*
+         * Crafting TODO:
+         *   Load Extra Ingredients
+         *   Force craft button disable (unless survival recipe)
+         *   Hide/Remove free crafting
+         *   Hide/Remove other recipes 
+         *   Autoload targetted item
+         * 
+         * 
+         * 
+         * Tools:
+         *   SetCraftButtonEnable
+         *   SetRecipeResult
+         *   RefreshItemDetailDisplay
+         * 
+         */
+
+        public static CraftingMenu CraftMenu = null;
+        public static Recipe.CraftingType[] CraftingTypes = { Recipe.CraftingType.Alchemy, Recipe.CraftingType.Cooking, Recipe.CraftingType.Survival };
+
+        public static void LoadAllRecipesFor(ItemContainer container)
+        {
+            // TODO
+            //   Show recipes from all crafting stations that the container has at least ONE ingredient for
+            //   Change background image to match crafting station needed
+            //   Confirm and VALIDATE that user cannot craft using this station
+
+            Log("Selecting Container: " + container.Name);
+
+            Character local = ((CharacterUI)SideLoader.At.GetField<UIElement>(CraftMenu, "m_characterUI"))?.TargetCharacter;
+
+
+            List<Recipe> allRecipes = new List<Recipe>();
+            foreach (Recipe.CraftingType type in CraftingTypes)
+            {
+                Log("Loading " + type.ToString() + " Recipes");
+                allRecipes.AddRange(RecipeManager.Instance.GetRecipes(type, local));
+            }
+            allRecipes.Sort(new Comparison<Recipe>(Recipe.SortByName));
+            SideLoader.At.SetField(CraftMenu, "m_allRecipes", allRecipes);
+            Log("Loaded " + allRecipes.Count + " Recipes");
+
+            SideLoader.At.SetField(CraftMenu, "m_refreshComplexeRecipeRequired", true);
+
+            SideLoader.At.Invoke(CraftMenu, "RefreshAutoRecipe", new object[0]);
+        }
+
+        public static Item SelectedItem = null;
+
+        public static void FilterRecipes(Item item)
+        {
+            // TODO
+            //   Similar to above, just filter to any known recipes that include this item
+
+            SelectedItem = item;
+            int id = -1;
+            if (SelectedItem != null)
+                id = SelectedItem.ItemID;
+
+            List<RecipeDisplay> recipeDisplays = (List<RecipeDisplay>)SideLoader.At.GetField(CraftMenu, "m_recipeDisplays");
+            foreach (RecipeDisplay disp in recipeDisplays)
+            {
+                bool hasIngredient = false;
+
+                IList<int> best = (IList<int>)SideLoader.At.GetField(disp, "m_bestIngredients");
+                foreach (int val in best)
+                    hasIngredient |= val == id;
+
+                disp.gameObject.SetActive(hasIngredient);
+            }
+        }
+
+        public static void OnChangeRecipe()
+        {
+            /*
+             * CraftingMenu.Show()
+             * 
+	        if (this.m_singleIngredientBackground)
+	        {
+		        this.m_singleIngredientBackground.SetAlpha((float)(this.m_simpleMode ? 1 : 0));
+	        }
+	        if (this.m_multipleIngrenentsBrackground)
+	        {
+		        this.m_multipleIngrenentsBrackground.SetAlpha((float)((!this.m_simpleMode) ? 1 : 0));
+	        }
+	        for (int i = 1; i < this.m_ingredientSelectors.Length; i++)
+	        {
+		        this.m_ingredientSelectors[i].Show(!this.m_simpleMode);
+	        }
+
+	        int num = -1;
+	        Sprite overrideSprite = null;
+	        switch (this.m_craftingStationType)
+	        {
+	        case Recipe.CraftingType.Alchemy:
+		        num = 0;
+		        overrideSprite = this.m_alchemyCraftingBg;
+		        break;
+	        case Recipe.CraftingType.Cooking:
+		        if (this.m_craftingStation.AllowComplexRecipe)
+		        {
+			        num = 3;
+			        overrideSprite = this.m_cookingPotCraftingBg;
+		        }
+		        else
+		        {
+			        num = 2;
+			        overrideSprite = this.m_cookingFireCraftingBg;
+		        }
+		        break;
+	        case Recipe.CraftingType.Survival:
+		        num = 1;
+		        overrideSprite = this.m_survivalCraftingBg;
+		        break;
+	        case Recipe.CraftingType.Forge:
+		        num = 4;
+		        overrideSprite = this.m_alchemyCraftingBg;
+		        break;
+	        }
+	        if (this.m_lblFreeRecipeDescription)
+	        {
+		        this.m_lblFreeRecipeDescription.text = LocalizationManager.Instance.GetLoc(CraftingMenu.m_freeRecipesLocKey[num]);
+	        }
+	        if (this.m_imgCraftingBackground)
+	        {
+		        this.m_imgCraftingBackground.overrideSprite = overrideSprite;
+	        }
+	        this.ResetFreeRecipeLastIngredients();
+	        this.m_allRecipes = RecipeManager.Instance.GetRecipes(this.m_craftingStationType, base.LocalCharacter);
+	        this.m_allRecipes.Sort(new Comparison<Recipe>(Recipe.SortByName));
+	        this.m_refreshComplexeRecipeRequired = true;
+	        this.RefreshAutoRecipe();
+	        this.OnRecipeSelected(-1, true);
+            */
+        }
+
+        [HarmonyPatch(typeof(CraftingMenu))]
+        public class CraftingMenu_Hooks
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("RefreshAutoRecipe")]
+            public static void Postfix1(ref List<Recipe> ___m_allRecipes)
+            {
+                Log("CraftingMenu_Hooks + RefreshAutoRecipe -- " + ___m_allRecipes.Count);
+                if (AssistantActive)
+                    FilterRecipes(SelectedItem);
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch("RefreshAvailableIngredients")]
+            public static bool Prefix2(ref DictionaryExt<int, CompatibleIngredient> ___m_availableIngredients, CharacterUI ___m_characterUI)
+            {
+                if (AssistantActive)
+                {
+                    for (int i = 0; i < ___m_availableIngredients.Count; i++)
+                    {
+                        ___m_availableIngredients.Values[i].Clear();
+                    }
+                    foreach (Recipe.CraftingType type in CraftingTypes)
+                    {
+                        Tag craftingIngredient = TagSourceManager.GetCraftingIngredient(type);
+                        ___m_characterUI.TargetCharacter.Inventory.InventoryIngredients(craftingIngredient, ref ___m_availableIngredients);
+                    }
+                    return false;
+                }
+                return true;
+            }
         }
 
         private static ItemContainer CreateContainerFor(Character player)
@@ -204,12 +354,62 @@ namespace RecipeAssistant
             if (ContainerWrapper.Instance == null)
                 ContainerWrapper.Init();
 
-            Log("CreateContainerFor");
-            ContainerWrapper.LoadItemsFromContainer(player.Inventory.Pouch);
-            ContainerWrapper.LoadItemsFromContainer(player.Inventory.EquippedBag?.Container);
-            ContainerWrapper.LoadItemsFromEquipment(player.Inventory.Equipment);
+            List<Item> items = new List<Item>();
+
+            foreach (Item item in player.Inventory.Pouch.GetContainedItems())
+                items.Add(item);
+
+            if (player.Inventory.EquippedBag?.Container != null)
+                foreach (Item item in player.Inventory.EquippedBag.Container.GetContainedItems())
+                    items.Add(item);
+
+            EquipmentSlot[] slots = (EquipmentSlot[])SideLoader.At.GetField(player.Inventory.Equipment, "m_equipmentSlots");
+            foreach (EquipmentSlot slot in slots)
+                if (slot?.EquippedItem != null)
+                    items.Add(slot.EquippedItem);
+
+            DictionaryExt<int, CompatibleIngredient> possibleIngredients = new DictionaryExt<int, CompatibleIngredient>();
+
+            foreach (Recipe.CraftingType type in CraftingTypes)
+                InventoryIngredients(TagSourceManager.GetCraftingIngredient(type), ref possibleIngredients, items);
+
+            foreach (int key in possibleIngredients.Keys)
+                ContainerWrapper.AddItemToWrapper(key.ToString());
 
             return ContainerWrapper.Instance;
+        }
+
+        // Just stole this from CharacterInventory because reflection calls don't like the ref
+        private static void InventoryIngredients(Tag _craftingStationTag, ref DictionaryExt<int, CompatibleIngredient> _sortedIngredient, IList<Item> _items)
+        {
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (!_items[i].IsEnchanted && _items[i].HasTag(_craftingStationTag))
+                {
+                    CompatibleIngredient compatibleIngredient = null;
+                    if (!(_items[i] is WaterContainer) || ((WaterContainer)_items[i]).RemainingUse == 0)
+                    {
+                        if (!_sortedIngredient.TryGetValue(_items[i].ItemID, out compatibleIngredient))
+                        {
+                            compatibleIngredient = new CompatibleIngredient(_items[i].ItemID);
+                            _sortedIngredient.Add(_items[i].ItemID, compatibleIngredient);
+                        }
+                    }
+                    else
+                    {
+                        Item waterItem = WaterItem.GetWaterItem(((WaterContainer)_items[i]).ContainedWater);
+                        if (waterItem && !_sortedIngredient.TryGetValue(waterItem.ItemID, out compatibleIngredient))
+                        {
+                            compatibleIngredient = new CompatibleIngredient(waterItem.ItemID);
+                            _sortedIngredient.Add(waterItem.ItemID, compatibleIngredient);
+                        }
+                    }
+                    if (compatibleIngredient != null)
+                    {
+                        compatibleIngredient.AddOwnedItem(_items[i]);
+                    }
+                }
+            }
         }
 
         [HarmonyPatch(typeof(ItemDisplayOptionPanel))]
@@ -251,15 +451,15 @@ namespace RecipeAssistant
                     CharUI.CloseAllMenus();
 
                     EnvironmentItemDisplay environ = (EnvironmentItemDisplay)m_menus[(int)CharacterUI.MenuScreens.PreviewContainer];
-                    CraftingMenu craft = (CraftingMenu)m_menus[(int)CharacterUI.MenuScreens.Crafting];
+                    CraftMenu = (CraftingMenu)m_menus[(int)CharacterUI.MenuScreens.Crafting];
 
                     CraftedBox = CreateContainerFor(player);
                     environ.Show(CraftedBox);
-                    ((Text)SideLoader.At.GetField(environ, "m_lblTitle")).text = "Inventory";
+                    ((Text)SideLoader.At.GetField(environ, "m_lblTitle")).text = "Ingredients";
                     ((Button)SideLoader.At.GetField(environ, "m_btnTakeAll")).gameObject.SetActive(false);
                     environ.SetIsParallel(CharacterUI.MenuScreens.Inventory);
 
-                    craft.Show();
+                    CraftMenu.Show();
 
 
                     Text ___m_lblSectionName = (Text)SideLoader.At.GetField(CharUI, "m_lblSectionName");
@@ -280,6 +480,8 @@ namespace RecipeAssistant
                         }
                     }
 
+                    LoadAllRecipesFor(CraftedBox);
+
                     ___m_activatedItemDisplay = null;
                     ___m_pendingItem = null;
                     CharUI.ContextMenu.Hide();
@@ -294,7 +496,7 @@ namespace RecipeAssistant
         {
             [HarmonyPrefix]
             [HarmonyPatch("RefreshShowTakeAll")]
-            public static bool Prefix(EnvironmentItemDisplay __instance, ref List<ContainerDisplay> ___m_containerDisplayList, ref Button ___m_btnTakeAll)
+            public static bool Prefix1(EnvironmentItemDisplay __instance, ref List<ContainerDisplay> ___m_containerDisplayList, ref Button ___m_btnTakeAll)
             {
                 if (___m_containerDisplayList[0] != null)
                 {
@@ -316,6 +518,24 @@ namespace RecipeAssistant
 
                 }
                 return true;
+            }
+
+            [HarmonyPrefix]
+            [HarmonyPatch("OnItemSelected", new Type[] { typeof(IItemDisplay) })]
+            public static bool Prefix2()
+            {
+                return !AssistantActive;
+            }
+        }
+
+        [HarmonyPatch(typeof(WorldSave), "PrepareSave")]
+        public class WorldSave_PrepareSave
+        {
+            [HarmonyPrefix]
+            public static void Prefix()
+            {
+                if (AssistantActive)
+                    CloseAssistant();
             }
         }
 
@@ -339,6 +559,57 @@ namespace RecipeAssistant
                 if (AssistantActive && __instance.LinkedMenuID == CharacterUI.MenuScreens.PreviewContainer)
                 {
                     __instance?.Footer?.AcceptInputDisplay?.gameObject?.SetActive(false);
+                }
+            }
+        }
+
+        [HarmonyPatch(typeof(ItemDisplayClick), "OnPointerClick")]
+        public class ItemDisplayClick_OnPointerClick
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(ItemDisplayClick __instance)
+            {
+                return !AssistantActive;
+            }
+        }
+
+        public static Selectable SelectedObject = null;
+        public static GameObject highlight = null;
+
+        [HarmonyPatch(typeof(Selectable))]
+        public class Selectable_Hooks
+        {
+            [HarmonyPostfix]
+            [HarmonyPatch("UpdateSelectionState")]
+            public static void Postfix2(Selectable __instance, BaseEventData eventData, ref int ___m_CurrentSelectionState)
+            {
+                if (AssistantActive && __instance.transform.FindParentByName("Environment") != null)
+                    SelectAndHighlightObject(__instance);
+
+            }
+
+            public static void SelectAndHighlightObject(Selectable obj)
+            {
+                ItemDisplay display = obj.gameObject.GetComponent<ItemDisplay>();
+                int currentSelectionState = (int)SideLoader.At.GetField(obj, "m_CurrentSelectionState");
+                if (display?.RefItem != null && currentSelectionState == 2)
+                {
+                    FilterRecipes(display.RefItem);
+                    SelectedObject = obj;
+
+                    if (highlight == null)
+                    {
+                        GameObject original = obj.gameObject.transform.FindInAllChildren("imgHighlight").gameObject;
+                        highlight = Instantiate(original, new Vector3(0, 0, 0), Quaternion.identity);
+                        highlight.name = "Test_Highlight";
+                    }
+
+                    highlight.transform.parent = SelectedObject.transform;
+                    highlight.SetActive(true);
+                    RectTransform highRect = highlight.GetComponent<RectTransform>();
+                    highRect.anchoredPosition = new Vector2(0, 0);
+                    highRect.offsetMax = new Vector2(5, 5);
+                    highRect.offsetMin = new Vector2(-5, -5);
                 }
             }
         }
