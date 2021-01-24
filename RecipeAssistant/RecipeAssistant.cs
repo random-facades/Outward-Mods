@@ -581,11 +581,19 @@ namespace RecipeAssistant
         {
             [HarmonyPostfix]
             [HarmonyPatch("UpdateSelectionState")]
-            public static void Postfix2(Selectable __instance, BaseEventData eventData, ref int ___m_CurrentSelectionState)
+            public static void Postfix1(Selectable __instance, BaseEventData eventData, ref int ___m_CurrentSelectionState)
             {
                 if (AssistantActive && __instance.transform.FindParentByName("Environment") != null)
                     SelectAndHighlightObject(__instance);
 
+            }
+
+            [HarmonyPostfix]
+            [HarmonyPatch("OnPointerUp")]
+            public static void Postfix2()
+            {
+                if (AssistantActive)
+                    CraftMenu.Focus();
             }
 
             public static void SelectAndHighlightObject(Selectable obj)
