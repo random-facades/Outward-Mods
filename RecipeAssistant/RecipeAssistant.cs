@@ -25,7 +25,6 @@
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
-using SharedModConfig;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -33,42 +32,6 @@ using UnityEngine.UI;
 
 namespace RecipeAssistant
 {
-    public class Settings
-    {
-        public static bool Setting = false;
-        public static string Setting_Name = "Setting";
-
-        public static ModConfig Instance;
-
-        public static void OnChanged()
-        {
-            Setting = (bool)Instance.GetValue(Setting_Name);
-        }
-
-        public static void SetupConfig()
-        {
-            var newConfig = new ModConfig
-            {
-                ModName = RecipeAssistant.NAME,
-                SettingsVersion = RecipeAssistant.VersionNum,
-                Settings = new List<BBSetting>
-                {
-                    new BoolSetting
-                    {
-                        Name = Setting_Name,
-                        Description = "Disable Item Price Labels",
-                        DefaultValue = false
-                    }
-                }
-            };
-            Instance = newConfig;
-            Instance.Register();
-            Instance.OnSettingsSaved += OnChanged;
-
-            OnChanged();
-        }
-    }
-
     public class ContainerWrapper
     {
         public static ItemContainer Instance;
@@ -126,7 +89,6 @@ namespace RecipeAssistant
     }
 
     [BepInPlugin(ID, NAME, VERSION)]
-    [BepInDependency("com.sinai.SharedModConfig", BepInDependency.DependencyFlags.HardDependency)]
     public class RecipeAssistant : BaseUnityPlugin
     {
         public const string ID = "com.random_facades.recipeassistant";
@@ -155,8 +117,6 @@ namespace RecipeAssistant
 
             var harmony = new Harmony(ID);
             harmony.PatchAll();
-
-            Settings.SetupConfig();
 
             Log("Recipe Assistant starting...");
         }
@@ -231,6 +191,7 @@ namespace RecipeAssistant
                 }
                 disp.gameObject.SetActive(hasIngredient);
             }
+            CraftMenu.OnRecipeSelected(-1);
         }
 
         private static List<Item> GetAllItemsFrom(Character player)
@@ -555,22 +516,31 @@ namespace RecipeAssistant
                 int currentSelectionState = (int)SideLoader.At.GetField(obj, "m_CurrentSelectionState");
                 if (display?.RefItem != null && currentSelectionState == 2)
                 {
-                    FilterRecipes(display.RefItem);
-                    SelectedObject = obj;
-
-                    if (highlight == null)
+                    if (obj == SelectedObject)
                     {
-                        GameObject original = obj.gameObject.transform.FindInAllChildren("imgHighlight").gameObject;
-                        highlight = Instantiate(original, new Vector3(0, 0, 0), Quaternion.identity);
-                        highlight.name = "Test_Highlight";
+                        SelectedObject = null;
+                        FilterRecipes(null);
+                        highlight.SetActive(false);
                     }
+                    else
+                    {
+                        FilterRecipes(display.RefItem);
+                        SelectedObject = obj;
 
-                    highlight.transform.parent = SelectedObject.transform;
-                    highlight.SetActive(true);
-                    RectTransform highRect = highlight.GetComponent<RectTransform>();
-                    highRect.anchoredPosition = new Vector2(0, 0);
-                    highRect.offsetMax = new Vector2(5, 5);
-                    highRect.offsetMin = new Vector2(-5, -5);
+                        if (highlight == null)
+                        {
+                            GameObject original = obj.gameObject.transform.FindInAllChildren("imgHighlight").gameObject;
+                            highlight = Instantiate(original, new Vector3(0, 0, 0), Quaternion.identity);
+                            highlight.name = "Test_Highlight";
+                        }
+
+                        highlight.transform.parent = SelectedObject.transform;
+                        highlight.SetActive(true);
+                        RectTransform highRect = highlight.GetComponent<RectTransform>();
+                        highRect.anchoredPosition = new Vector2(0, 0);
+                        highRect.offsetMax = new Vector2(5, 5);
+                        highRect.offsetMin = new Vector2(-5, -5);
+                    }
                 }
             }
         }
