@@ -159,12 +159,15 @@ namespace ItemPriceHelper
                         labelText = "";
 
                     float modifier = (float)At.GetField(itemDisplay.RefItem, "m_overrideSellModifier");
+                    Log(modifier.ToString());
                     if (modifier == -1)
                     {
-                        modifier = 1 + itemDisplay.CharacterUI.TargetCharacter.GetItemSellPriceModifier(null, itemDisplay.RefItem);
+
+                        modifier = 1 + CharacterManager.Instance.GetFirstLocalCharacter().GetItemSellPriceModifier(null, itemDisplay.RefItem);
                         modifier *= 0.3f;
                     }
                     float price = modifier * itemDisplay.RefItem.RawCurrentValue;
+                    Log(price.ToString());
 
                     if (Settings.ShowValue)
                     {
