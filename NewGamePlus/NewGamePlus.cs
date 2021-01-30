@@ -102,10 +102,10 @@ namespace NewGamePlus
     {
         const string ID = "com.random_facades.newgameplus";
         const string NAME = "New Game+";
-        const string VERSION = "1.1";
+        const string VERSION = "1.2";
         //  Can't be fancy cause localization issues
         //public static double VersionNum = double.Parse(VERSION);
-        public static double VersionNum = 1.1;
+        public static double VersionNum = 1.2;
 
         public static ModConfig config;
 
