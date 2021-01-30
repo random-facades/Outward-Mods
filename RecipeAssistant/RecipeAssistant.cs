@@ -330,11 +330,12 @@ namespace RecipeAssistant
         {
             [HarmonyPostfix]
             [HarmonyPatch("GetActiveActions", new Type[] { typeof(GameObject) })]
-            public static void Postfix_GetActiveActions(CharacterUI ___m_characterUI, ref List<int> __result)
+            public static void Postfix_GetActiveActions(ItemDisplayOptionPanel __instance, Item ___m_pendingItem, ref List<int> __result)
             {
+                CharacterInventory characterInventory = __instance.LocalCharacter?.Inventory;
                 if (AssistantActive)
                     __result.Clear();
-                else if(___m_characterUI.GetIsMenuDisplayed(CharacterUI.MenuScreens.Inventory))
+                else if (characterInventory != null && characterInventory.OwnsItem(___m_pendingItem.UID))
                     __result.Add(ACTION_ID);
             }
 
