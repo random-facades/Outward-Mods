@@ -93,8 +93,8 @@ namespace RecipeAssistant
     {
         public const string ID = "com.random_facades.recipeassistant";
         public const string NAME = "Recipe Assistant";
-        public const string VERSION = "1.0";
-        public static double VersionNum = 1.0;
+        public const string VERSION = "1.1";
+        public static double VersionNum = 1.1;
 
         public const int ACTION_ID = 33;
 
@@ -141,7 +141,7 @@ namespace RecipeAssistant
         public static CraftingMenu CraftMenu = null;
         public static Recipe.CraftingType[] CraftingTypes = { Recipe.CraftingType.Alchemy, Recipe.CraftingType.Cooking, Recipe.CraftingType.Survival };
 
-        public static void LoadAllRecipesFor(ItemContainer container)
+        public static void LoadAllRecipes()
         {
             Character local = ((CharacterUI)SideLoader.At.GetField<UIElement>(CraftMenu, "m_characterUI"))?.TargetCharacter;
 
@@ -330,11 +330,11 @@ namespace RecipeAssistant
         {
             [HarmonyPostfix]
             [HarmonyPatch("GetActiveActions", new Type[] { typeof(GameObject) })]
-            public static void Postfix_GetActiveActions(ItemDisplayOptionPanel __instance, ref List<int> __result)
+            public static void Postfix_GetActiveActions(CharacterUI ___m_characterUI, ref List<int> __result)
             {
                 if (AssistantActive)
                     __result.Clear();
-                else
+                else if(___m_characterUI.GetIsMenuDisplayed(CharacterUI.MenuScreens.Inventory))
                     __result.Add(ACTION_ID);
             }
 
@@ -356,12 +356,15 @@ namespace RecipeAssistant
             {
                 if (_actionID == ACTION_ID)
                 {
-                    AssistantActive = true;
                     CharUI = ___m_characterUI;
                     MenuPanel[] m_menus = (MenuPanel[])SideLoader.At.GetField(___m_characterUI, "m_menus");
 
                     Character player = CharacterManager.Instance.GetFirstLocalCharacter();
                     CharUI.CloseAllMenus();
+
+                    // Actually start the assistant
+                    //   Don't do it before closing menus cause weird shit happens
+                    AssistantActive = true;
 
                     EnvironmentItemDisplay environ = (EnvironmentItemDisplay)m_menus[(int)CharacterUI.MenuScreens.PreviewContainer];
                     CraftMenu = (CraftingMenu)m_menus[(int)CharacterUI.MenuScreens.Crafting];
@@ -394,7 +397,7 @@ namespace RecipeAssistant
                         }
                     }
 
-                    LoadAllRecipesFor(CraftedBox);
+                    LoadAllRecipes();
 
                     ___m_activatedItemDisplay = null;
                     ___m_pendingItem = null;
